@@ -1,6 +1,8 @@
 #This script approximates the overlap area between two rotated
 #ellipses using a many-sided polygon and the shoelace algorithm.
 
+timer <- proc.time()
+
 #--------------------------------
 #The equation of a rotated ellipse is provided here for reference.
 #NOTE: The direction of rotation is counterclockwise and the angle 
@@ -13,9 +15,9 @@
 #NOTE: User stores values for a1,b1,h1,k1,c1 and a2,b2,h2,k2,c2
 
 #For testing purposes, we create a specific example:
-h1<-6
+h1<-2
 k1<-2
-a1<-1
+a1<-5
 b1<-4
 c1<-10 #measured in degrees
 
@@ -169,3 +171,5 @@ print(paste("Area of Ellipse 1 =",area_e1))
 print(paste("Area of Ellipse 2 =",area_e2))
 print(paste("Area of Overlap =",area))
 
+time<-proc.time()-timer
+print(time)
