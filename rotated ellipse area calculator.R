@@ -15,20 +15,20 @@ timer <- proc.time()
 #NOTE: User stores values for a1,b1,h1,k1,c1 and a2,b2,h2,k2,c2
 
 #For testing purposes, we create a specific example:
-h1<-2
+h1<-6
 k1<-2
 a1<-5
 b1<-4
 c1<-10 #measured in degrees
 
-h2<-(-2)
+h2<-6
 k2<-3
 a2<-3
-b2<-1
+b2<-2
 c2<-(30) #measured in degrees
 
 #Generate x-values for the first ellipse without rotation
-e1x<-seq(h1-a1,h1+a1, by=.1)
+e1x<-seq(h1-a1,h1+a1, by=.02)
 e1xd<-sort(e1x, decreasing = TRUE)
 #Determine corresponding y-values without rotation
 e1yp <- k1 + sqrt(b1^2*(1-(e1x-h1)^2/a1^2))
@@ -48,7 +48,7 @@ e1$x<-(e1coord$e1x-h1)*cos(c1*pi/180)-(e1coord$e1y-k1)*sin(c1*pi/180)+h1
 e1$y<-(e1coord$e1x-h1)*sin(c1*pi/180)+(e1coord$e1y-k1)*cos(c1*pi/180)+k1
 
 #Generate x-values for the second ellipse without rotation
-e2x<-seq(h2-a2,h2+a2, by=.1)
+e2x<-seq(h2-a2,h2+a2, by=.02)
 e2xd<-sort(e2x, decreasing = TRUE)
 #Determine corresponding y-values without rotation
 e2yp <- k2 + sqrt(b2^2*(1-(e2x-h2)^2/a2^2))
@@ -155,17 +155,20 @@ area_e1<-pi*a1*b1
 area_e2<-pi*a2*b2
 
 #Calculate the area of the polygon using the shoelace algorithm
-l<-nrow(polycoord)
-products<-vector(length=l)
-xval<-polycoord[,1]
-yval<-polycoord[,2]
 
-for(i in 1:(l-1)){
-  products[i]<-(xval[i]*yval[i+1]-yval[i]*xval[i+1])
+if(nrow(e1keep)!=0 | nrow(e2keep)!=0){
+  l<-nrow(polycoord)
+  products<-vector(length=l)
+  xval<-polycoord[,1]
+  yval<-polycoord[,2]
+  
+  for(i in 1:(l-1)){
+    products[i]<-(xval[i]*yval[i+1]-yval[i]*xval[i+1])
+  }
+  products[l]<-xval[l]*yval[1]-yval[l]*xval[1]
+  
+  area<-abs(sum(products, na.rm=TRUE)/2)
 }
-products[l]<-xval[l]*yval[1]-yval[l]*xval[1]
-
-area<-abs(sum(products, na.rm=TRUE)/2)
 
 print(paste("Area of Ellipse 1 =",area_e1))
 print(paste("Area of Ellipse 2 =",area_e2))
