@@ -1,0 +1,181 @@
+#This function will create a grid os a specific shape and interval and plot it over random field maps to measure
+#the probability of locating sites.
+
+##n.rows<- number of rows per km that that will be created in map.
+##grid.type<- options are: "square","rectangle","staggered","hexagonal","arbitrary.staggered", following Kintigh 1988
+##simulations<- number ofrandom map to be created and contrasted with the grids.
+##ALL the other variables: variables that are passed to FieldMap. Check comments on this function for details.
+
+SurveyGrid<-function(n.rows,grid.type="square",simulations=100, Area,site.density,site.area,overlap=0.50,plot=FALSE,accu.area=FALSE){
+  #We start with some checks and trying to make the function more user friendly
+  
+  GRID<-c("square","rectangle","staggered","hexagonal","arbitrary.staggered")
+  
+  grid.type<-pmatch(grid.type,GRID)
+  
+  if (is.na(grid.type)){
+    stop(cat("ERROR: invalid grid type.","Valid grids are: square,rectangle,staggered,hexagonal,arbitrary.staggered",sep="\n"))
+  }
+  
+  #1. We will get the number of rows t, and then i (interval between units in a row),s(space between rows),
+  # and e (Distance from transect to survey area edge)
+  
+  t<-floor(n.rows*Area[1])
+  
+  if(grid.type==1){ #square
+    
+    s=(Area[1])/(t-1)
+    i=s
+  }
+  if(grid.type==2){ #rectangle
+    
+    s=(Area[1])/(t-1)
+    tmp<-as.numeric(readline(prompt = "Type  the ratio between length and width of the rectangles in the grid:"))
+    
+    i=s*tmp
+    
+  }
+  if(grid.type==3){ #staggered
+    
+    s=(Area[1])/(t-1)
+    i=s
+  }
+  if(grid.type==4){ #hexagonal
+    
+    s=(Area[1])/(t-1)
+    i=(s*2)/3^0.5
+    
+  }
+  if(grid.type==5){ #arbitrary staggered
+    
+    s=(Area[1])/(t-1)
+    tmp<-as.numeric(readline(prompt = "Type  the ratio between length and width of the rectangles in the grid:"))
+    i=s*tmp
+  }
+  
+  #2. We create the grid (or rather the points of intersection)
+  
+  xseq<-seq(0,Area[1],length=t)
+  yseq<-seq(0,Area[2],by=i)
+  
+  #i.this is theobject that will store final summary stats
+  SurveySummary<-matrix(0,simulations,8)
+  colnames(SurveySummary)<-c("#SurveyHits","#TotalSurveys","#SitesFound","#TotalSites","%SitesFound","%SurveyFind","MaxSurveys/Site","AvgSurveys/Site")
+  
+  #3. We create now the loop that will create all the maps and grids
+  for (a in 1:simulations){
+    
+    sitemap<-FieldMap(Area,site.density,site.area,overlap,accu.area,plot=FALSE)
+   
+    
+    #3a. We check how many survey dots are within a site. This is still a simplified version, since it assumes that the pits are dots (without area)
+    #i create the object that will store which points are inside which ellipses
+      GridXSites<-matrix(NA,length(xseq)*length(yseq),nrow(sitemap$site.dataframe))
+    
+      linecounter<-0
+      
+      for(b in 1:length(xseq)){
+        for(c in 1:length(yseq)){
+          #ii here we check each survey pit against each site. this will be a looooong equation!
+          
+          linecounter<-linecounter+1
+          #((x-h)*cos(c)+(y-k)*sin(c))^2/a^2+((x-h)*sin(c)-(y-k)*cos(c))^2/b^2<=1
+          site.frame<-sitemap$site.dataframe
+          Siteintercept<-((xseq[b]-site.frame[,5])*cos(site.frame[,4])+(yseq[c]-site.frame[,6])*sin(site.frame[,4]))^2/(site.frame[,7])^2+
+                                 ((xseq[b]-site.frame[,5])*sin(site.frame[,4])-(yseq[c]-site.frame[,6])*cos(site.frame[,4]))^2/(site.frame[,8])^2<=1
+          
+          GridXSites[linecounter,]<-Siteintercept
+          
+        }
+      }
+    
+    SiteStats<-apply(GridXSites,2,sum)
+    SurveyStats<-apply(GridXSites,1,sum)
+    
+    #Gettin the summary surveys 
+    SurveySummary[a,1]<-length(which(SurveyStats>=1))
+    SurveySummary[a,2]<-length(xseq)*length(yseq)
+    SurveySummary[a,3]<-length(which(SiteStats>=1))
+    SurveySummary[a,4]<-nrow(sitemap$site.dataframe)
+    SurveySummary[a,5]<-SurveySummary[a,3]/SurveySummary[a,4]
+    SurveySummary[a,6]<-SurveySummary[a,1]/SurveySummary[a,2]
+    SurveySummary[a,7]<-max(SiteStats)
+    SurveySummary[a,8]<-mean(SiteStats)
+     
+
+    #4.We plot the final loop, if plot = true as an example of the grid over the sites.   
+    if(plot==TRUE && a==simulations){
+      plot.new()
+      plot.window(c(0,Area[1]),c(0,Area[2]))
+      
+      axis(1,at=round(xseq,2))
+      axis(2,at=round(yseq,2))
+      box()
+      
+      for(sites in 1:sitemap$sites.created){
+        text(sitemap$site.dataframe[sites,5],sitemap$site.dataframe[sites,6],sitemap$site.dataframe[sites,1],pos=3,cex=0.5)
+        points(sitemap$site.dataframe[sites,5],sitemap$site.dataframe[sites,6],pch=16)
+        
+        #1.Get the angles, x and y to plot the ellypses
+        angles<-seq(0,2*pi,length=72)
+        
+        #x= h + a cos(t)*cos(c)-b*sin(t)*sin(c)
+        xcoords<- sitemap$site.dataframe[sites,5]+sitemap$site.dataframe[sites,7]*cos(angles)*cos(sitemap$site.dataframe[sites,4])-sitemap$site.dataframe[sites,8]*sin(angles)*sin(sitemap$site.dataframe[sites,4]) 
+        #y= k + b sin(t)*cos(c)+a*cos(t)*sin(c)  
+        ycoords<- sitemap$site.dataframe[sites,6]+sitemap$site.dataframe[sites,8]*sin(angles)*cos(sitemap$site.dataframe[sites,4])+sitemap$site.dataframe[sites,7]*cos(angles)*sin(sitemap$site.dataframe[sites,4])  
+        
+        polygon(xcoords,ycoords,col=rgb(0,0,1,0.5),border=NA)
+        
+      }
+      
+      
+      for(r in 1:length(yseq)){
+        xvals = xseq
+        nextxvals = xseq
+        
+        if(grid.type==3||grid.type==4||grid.type==5)
+          if(r%%2==0){
+            xvals=xseq+0.5*s
+            xvals<-xvals[-length(xvals)]
+          }else{
+            #this is for me to plot the lines that connect the survey dots
+            nextxvals=nextxvals+0.5*s
+            nextxvals<-nextxvals[-length(xvals)]
+          }
+        
+        
+        points(xvals,rep(yseq[r],length(xvals)),pch=16)
+        
+        
+        #here I plot lines for the grids, to make them look nicer
+        lines(c(xvals[1],xvals[length(xvals)]),c(yseq[r],yseq[r]),lty=2)
+        
+        
+        if(r!=length(yseq)){
+          for(b in 1: length(xvals)){
+            if(is.na(nextxvals[b])!=TRUE){
+              lines(c(xvals[b],nextxvals[b]),c(yseq[r],yseq[r+1]),lty=2)
+            }
+          }
+        }
+        #and this is just to add lines to the hexagon to make the grid look like triangles
+        if(grid.type==4){
+          if(r%%2==1){
+            for (b in 2:length(xvals)){
+              lines(c(xvals[b],nextxvals[b-1]),c(yseq[r],yseq[r+1]),lty=2)
+            } 
+            
+          }else{
+            for (b in 1:length(xvals)){
+              lines(c(xvals[b],nextxvals[b+1]),c(yseq[r],yseq[r+1]),lty=2)
+            } 
+          }
+          
+          
+        }
+      }
+    }
+  }
+  
+  return(SurveySummary)
+}
