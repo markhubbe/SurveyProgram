@@ -1,12 +1,12 @@
 #This function will create a grid os a specific shape and interval and plot it over random field maps to measure
 #the probability of locating sites.
 
-##n.rows<- number of rows per km that that will be created in map.
+##col.width<- the space between columns in the grid IN METERS.
 ##grid.type<- options are: "square","rectangle","staggered","hexagonal","arbitrary.staggered", following Kintigh 1988
 ##simulations<- number ofrandom map to be created and contrasted with the grids.
 ##ALL the other variables: variables that are passed to FieldMap. Check comments on this function for details.
 
-SurveyGrid<-function(n.rows,grid.type="square",simulations=100, Area,site.density,site.area,overlap=0.50,plot=FALSE,accu.area=FALSE){
+SurveyGrid<-function(col.width,grid.type="square",simulations=100, Area,site.density,site.area,overlap=0.50,plot=FALSE,accu.area=FALSE){
   #We start with some checks and trying to make the function more user friendly
   
   GRID<-c("square","rectangle","staggered","hexagonal","arbitrary.staggered")
@@ -17,19 +17,21 @@ SurveyGrid<-function(n.rows,grid.type="square",simulations=100, Area,site.densit
     stop(cat("ERROR: invalid grid type.","Valid grids are: square,rectangle,staggered,hexagonal,arbitrary.staggered",sep="\n"))
   }
   
-  #1. We will get the number of rows t, and then i (interval between units in a row),s(space between rows),
+  #1. We will get the number of rows t, i (interval between units in a row),s(space between columns),
   # and e (Distance from transect to survey area edge)
   
-  t<-floor(n.rows*Area[1])
+  s<-col.width/1000
+  
+  t<-floor(Area[1]/s)+1
+  
+  e<-(Area[1]%%(s))/2
   
   if(grid.type==1){ #square
     
-    s=(Area[1])/(t-1)
     i=s
   }
   if(grid.type==2){ #rectangle
     
-    s=(Area[1])/(t-1)
     tmp<-as.numeric(readline(prompt = "Type  the ratio between length and width of the rectangles in the grid:"))
     
     i=s*tmp
@@ -37,25 +39,22 @@ SurveyGrid<-function(n.rows,grid.type="square",simulations=100, Area,site.densit
   }
   if(grid.type==3){ #staggered
     
-    s=(Area[1])/(t-1)
     i=s
   }
   if(grid.type==4){ #hexagonal
     
-    s=(Area[1])/(t-1)
-    i=(s*2)/3^0.5
+    i=(3^0.5/2)*s
     
   }
   if(grid.type==5){ #arbitrary staggered
     
-    s=(Area[1])/(t-1)
     tmp<-as.numeric(readline(prompt = "Type  the ratio between length and width of the rectangles in the grid:"))
     i=s*tmp
   }
   
   #2. We create the grid (or rather the points of intersection)
   
-  xseq<-seq(0,Area[1],length=t)
+  xseq<-seq(0,Area[1],by=s)
   yseq<-seq(0,Area[2],by=i)
   
   #i.this is theobject that will store final summary stats
@@ -70,19 +69,36 @@ SurveyGrid<-function(n.rows,grid.type="square",simulations=100, Area,site.densit
     
     #3a. We check how many survey dots are within a site. This is still a simplified version, since it assumes that the pits are dots (without area)
     #i create the object that will store which points are inside which ellipses
-      GridXSites<-matrix(NA,length(xseq)*length(yseq),nrow(sitemap$site.dataframe))
-    
+        
+      n.pits<-length(xseq)*length(yseq)
+      if(grid.type==3||grid.type==4||grid.type==5){
+        n.pits=n.pits-floor(length(yseq)/2)
+      }
+      
+      GridXSites<-matrix(NA,n.pits,nrow(sitemap$site.dataframe))
+      
       linecounter<-0
       
-      for(b in 1:length(xseq)){
-        for(c in 1:length(yseq)){
+      for(b in 1:length(yseq)){
+        if(grid.type==3||grid.type==4||grid.type==5){
+          if(b%%2==0){
+            xvals=xseq+0.5*s
+            xvals<-xvals[-length(xvals)]
+          } else {
+            xvals=xseq
+          }
+        }else{
+          xvals=xseq
+        }
+        
+        for(c in 1:length(xvals)){
           #ii here we check each survey pit against each site. this will be a looooong equation!
           
           linecounter<-linecounter+1
           #((x-h)*cos(c)+(y-k)*sin(c))^2/a^2+((x-h)*sin(c)-(y-k)*cos(c))^2/b^2<=1
           site.frame<-sitemap$site.dataframe
-          Siteintercept<-((xseq[b]-site.frame[,5])*cos(site.frame[,4])+(yseq[c]-site.frame[,6])*sin(site.frame[,4]))^2/(site.frame[,7])^2+
-                                 ((xseq[b]-site.frame[,5])*sin(site.frame[,4])-(yseq[c]-site.frame[,6])*cos(site.frame[,4]))^2/(site.frame[,8])^2<=1
+          Siteintercept<-((xvals[c]-site.frame[,5])*cos(site.frame[,4])+(yseq[b]-site.frame[,6])*sin(site.frame[,4]))^2/(site.frame[,7])^2+
+                                 ((xvals[c]-site.frame[,5])*sin(site.frame[,4])-(yseq[b]-site.frame[,6])*cos(site.frame[,4]))^2/(site.frame[,8])^2<=1
           
           GridXSites[linecounter,]<-Siteintercept
           
@@ -94,7 +110,7 @@ SurveyGrid<-function(n.rows,grid.type="square",simulations=100, Area,site.densit
     
     #Gettin the summary surveys 
     SurveySummary[a,1]<-length(which(SurveyStats>=1))
-    SurveySummary[a,2]<-length(xseq)*length(yseq)
+    SurveySummary[a,2]<-n.pits
     SurveySummary[a,3]<-length(which(SiteStats>=1))
     SurveySummary[a,4]<-nrow(sitemap$site.dataframe)
     SurveySummary[a,5]<-SurveySummary[a,3]/SurveySummary[a,4]

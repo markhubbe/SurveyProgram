@@ -143,8 +143,12 @@ FieldMap<-function(Area,site.density,site.area,overlap=0.50,plot=FALSE,accu.area
   names(results)[3]<-"overlap.area"
   
   }
-  
+  #I had to do the next if because when n=1, the site.frame is saved as a vector in the list
+  if(sites.created==1){
+  results[[length(results)+1]]<-site.frame  
+  }else{
   results[[length(results)+1]]<-site.frame[1:sites.created,]
+  }
   names(results)[length(results)]<-"site.dataframe"
   
   return(results)
